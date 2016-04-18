@@ -41,8 +41,9 @@ do
             sleep 1
         fi
     fi
-    aws ec2 create-tags --resources ${instanceId} --tags Key=名称,Value=${Name_pre}${result} Key=负责人,Value=${instance_principal} Key=维护人,Value=${instance_principal}
 done
+
+aws ec2 create-tags --resources ${instanceId} --tags Key=名称,Value=${Name_pre}${result} Key=负责人,Value=${instance_principal} Key=维护人,Value=${instance_principal}
 
 if [ "x${result}" = "x0" ]; then
     echo "`date +%Y-%m-%d@%H:%M:%S` 注册成功">>/tmp/instance_startup.log
