@@ -784,7 +784,8 @@ static int acf_curl_file_helper(struct ast_channel *chan, const char *cmd, char 
 	AST_LIST_HEAD(global_curl_info, curl_settings) *list = NULL;
 	char curl_errbuf[CURL_ERROR_SIZE + 1]; /* add one to be safe */
 	const char *curl_file;
-	const char *perm_file;
+	const char *cache_file;
+	const char *real_file;
 	char *tmp, *slash;
 	FILE *fp;
 	int need_caching = 0;
@@ -826,26 +827,25 @@ static int acf_curl_file_helper(struct ast_channel *chan, const char *cmd, char 
 		return 0;		
 	}	
 	
-	perm_file = curl_file;
-	curl_file = pbx_builtin_getvar_helper(chan, "CACHE_FILE");
-	if (ast_strlen_zero(curl_file)){
-                ast_log(LOG_WARNING, "CACHE_FILE is null\n");
-                curl_file = perm_file;
-        }
-	else{
-		need_caching = 1;		
+	cache_file = pbx_builtin_getvar_helper(chan, "CACHE_FILE");
+	if (ast_strlen_zero(cache_file)){
+            ast_log(LOG_WARNING, "CACHE_FILE is null\n");
+            tmp = ast_strdupa(curl_file);
+            real_file = curl_file;
+        }else{
+            need_caching = 1;    
+            tmp = ast_strdupa(cache_file);
+            real_file = cache_file; 
 	}
-
-	tmp = ast_strdupa(curl_file);
 	if((slash = strrchr(tmp,'/'))){
 		*slash = '\0';
 	}
 	ast_mkdir(tmp, 0777);
 
-	fp = fopen(curl_file, "wb+");
+	fp = fopen(real_file, "wb+");
 	if(!fp){
-		ast_log(LOG_ERROR, "fp is null ${CURL_FILE}=%s\n", curl_file);
-    	return -1;
+            ast_log(LOG_ERROR, "fp is null ${CURL_FILE}=%s\n", real_file);
+            return -1;
 	}
 	
 	AST_LIST_LOCK(&global_curl_info);
@@ -908,20 +908,20 @@ static int acf_curl_file_helper(struct ast_channel *chan, const char *cmd, char 
 	{	
 		int status;
 		
-		tmp = ast_strdupa(perm_file);
+       	tmp = ast_strdupa(curl_file); 
 		if((slash = strrchr(tmp,'/'))){
 				*slash = '\0';
 		}
 		ast_mkdir(tmp, 0777);
 		
-		status = rename(curl_file,perm_file);
+		status = rename(real_file,curl_file);
 		if(0 != status)
 		{
 			ast_log(LOG_ERROR, "renaming file's status = '%d'\
 				, errno='%d'\
 				, src file = '%s' \
 				,dst file ='%s.'\n", 
-				status, errno,curl_file,perm_file);
+				status, errno,real_file,curl_file);
 		}
 	}
 	ret = 0;

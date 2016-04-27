@@ -4,6 +4,47 @@
 #include "/etc/asterisk/global.ael"
 #include "/etc/asterisk/function.ael"
 
+
+macro fetch_tts_file_totally(text)
+{
+	Set(TTS_TEXT=${text});
+	Set(TTS_FILE=);
+	Set(TTS_URL_LIST=);
+	Set(tts_file_path_totally=);
+	AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
+	NoOp("TTS_FILE is"${TTS_FILE});
+	NoOp("TTS_URL_LIST is"${TTS_URL_LIST});
+	if("${TTS_FILE}" !=""){
+		Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
+		Set(l_tts_urlpath_num=${FIELDQTY(TTS_URL_LIST,;)});
+		
+		if(${l_tts_file_num} != ${l_tts_urlpath_num})
+		{
+			NoOp("There are some error on the number of TTS! ");			
+		}
+		else{
+			for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
+				Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
+				Set(l_tts_url=${CUT(TTS_URL_LIST,;,${i})});
+				if("${l_tts_file}" != ""&&"${l_tts_url}" != ""){
+					Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
+					Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
+					Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
+					Set(res=${CURL_FILE(${l_tts_url})});
+					Set(file=${TTS_FILEPATH}/${l_tts_file});
+					Set(tts_file_path_totally=${tts_file_path_totally}&${file}&noanswer);
+					NoOp("tts_file_path_totally is "${tts_file_path_totally});
+						                	
+				}
+			}			
+		}                
+	}
+	return;
+	catch h {
+        &set_ivr_flow_leave();
+        jump h@default;
+    };		
+}
 //ivr中播放节点
 macro ivr_play() {
     &set_ivr_flow_enter();
@@ -29,25 +70,10 @@ macro ivr_play() {
                 SayNumber(${${cur_node}_play_voice_${x}_file});
                 break;
             case 4:    // 4:tts
-                Set(TTS_TEXT=${${cur_node}_play_voice_${x}_file});
-				Set(TTS_FILE=);
-		        AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
-				NoOp("TTS_FILE is"${TTS_FILE});
-				//if(${REGEX(";" ${TTS_FILE})} == 1)
-				{
-			    	Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
-			       	for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
-	            		Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
-	            		if("${l_tts_file}" != ""){
-                		 	Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
-							Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
-                            Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
-                            Set(res=${CURL_FILE(https://${TTS_S3_URL}/${l_tts_file}.wav)});
-                            Set(file=${TTS_FILEPATH}/${l_tts_file});
-                            Playback(${file},noanswer);	                	
-			            }
-		        	}
-		    	}
+                Set(tts_text=${${cur_node}_play_voice_${x}_file});
+				&fetch_tts_file_totally(${tts_text});
+				Playback(${tts_file_path_totally});
+				
 				
                 break;
             case 5:    // 5:语音变量
@@ -68,26 +94,10 @@ macro ivr_play() {
             case 8:    // 8:tts变量
 				
 				
-				set(TTS_FILE=);
-				Set(TTS_TEXT=${${EVAL(${${cur_node}_play_voice_${x}_file})}});
-                AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
-
-                NoOp("TTS_FILE is"${TTS_FILE});
-                //if(${REGEX(";" ${TTS_FILE})} == 1)
-				{
-                        Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
-                         for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
-                                Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
-                                if("${l_tts_file}" != ""){
-                                        Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
-										Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
-                                        Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
-                                        Set(res=${CURL_FILE(https://${TTS_S3_URL}/${l_tts_file}.wav)});
-                                        Set(file=${TTS_FILEPATH}/${l_tts_file});
-                                        Playback(${file},noanswer);
-                                }
-                        }
-                }
+				Set(tts_text=${${EVAL(${${cur_node}_play_voice_${x}_file})}});
+				&fetch_tts_file_totally(${tts_text});
+				Playback(${tts_file_path_totally});
+				
                 break;
                 
                 
@@ -933,26 +943,12 @@ macro ivr_dial() {
 	            break;
 	       
 	        case 4:    // 4:tts
-	            Set(TTS_TEXT=${${cur_node}_dial_callee_voice_file});
-	            Set(TTS_FILE=);
-	            AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
-	            if("${TTS_FILE}" !=""){
-					Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
-			       	for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
-	            		Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
-	            		if("${l_tts_file}" != ""){
-	            		 	Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
-							Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
-	                        Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
-	                        Set(res=${CURL_FILE(https://${TTS_S3_URL}/${l_tts_file}.wav)});
-	                        Set(file=${TTS_FILEPATH}/${l_tts_file});
-							Set(callee_voice_file=${callee_voice_file}&${file}&noanswer);
-							NoOp("callee_voice_file is "${callee_voice_file});
-	                        //Playback(${file},noanswer);	                	
-			            }
-		        	}
-	                //Set(callee_voice_file=${TTS_FILE});	                
-	            }		    
+	            Set(tts_text=${${cur_node}_dial_callee_voice_file});
+				
+				&fetch_tts_file_totally(${tts_text});
+				Set(callee_voice_file=${tts_file_path_totally});
+				
+	           
 		    
 	            break;
 	        case 5:    // 5:语音变量
@@ -964,29 +960,17 @@ macro ivr_dial() {
 	        
 	        case 8:    // 8:tts变量
 	            Set(callee_voice_file=${${cur_node}_dial_callee_voice_file});
+				
 	            if("${${EVAL(${callee_voice_file})}}" != ""){
-	                Set(TTS_TEXT=${${EVAL(${callee_voice_file})}});
-	                Set(TTS_FILE=);
-	                AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
-	                if("${TTS_FILE}" !=""){
-						Set(callee_voice_file=);
-						Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
-				       	for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
-		            		Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
-		            		if("${l_tts_file}" != ""){
-		            		 	Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
-								Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
-		                        Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
-		                        Set(res=${CURL_FILE(https://${TTS_S3_URL}/${l_tts_file}.wav)});
-		                        Set(file=${TTS_FILEPATH}/${l_tts_file});
-								Set(callee_voice_file=${callee_voice_file}&${file}&noanswer);
-								NoOp("callee_voice_file is "${callee_voice_file});
-		                        //Playback(${file},noanswer);	                	
-				            }
-			        	}
-						
-	                    //Set(callee_voice_file=${TTS_FILE});	                    
-	                }
+	                Set(tts_text=${${EVAL(${callee_voice_file})}});
+					
+					
+				
+					&fetch_tts_file_totally(${tts_text});
+					Set(callee_voice_file=${tts_file_path_totally});
+					
+					
+	               
 	            }
 	            break;
 	        default:
@@ -1019,23 +1003,9 @@ macro ivr_dial() {
             SayNumber(${dial_file});
             break;
         case 4:    // 4:tts
-            Set(TTS_TEXT=${${cur_node}_dial_voice_${x}_file});
-            Set(TTS_FILE=);
-            AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
-            if("${TTS_FILE}" !=""){
-				 Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
-		       	for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
-            		Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
-            		if("${l_tts_file}" != ""){
-            		 	Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
-						Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
-                        Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
-                        Set(res=${CURL_FILE(https://${TTS_S3_URL}/${l_tts_file}.wav)});
-                        Set(file=${TTS_FILEPATH}/${l_tts_file});
-                        Playback(${file},noanswer);	                	
-		            }
-	        	}
-            }
+            Set(tts_text=${${cur_node}_dial_voice_${x}_file});
+            &fetch_tts_file_totally(${tts_text});
+			Playback(${tts_file_path_totally});
             break;
         case 5:    // 5:语音变量
             Set(dial_file=${${cur_node}_dial_voice_${x}_file});
@@ -1058,23 +1028,9 @@ macro ivr_dial() {
         case 8:    // 8:tts变量
             Set(dial_file=${${cur_node}_dial_voice_${x}_file});
             if("${${EVAL(${dial_file})}}" != ""){
-                Set(TTS_TEXT=${${EVAL(${dial_file})}});
-                Set(TTS_FILE=);
-                AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
-                if("${TTS_FILE}" !=""){
-                   Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
-                    for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
-                            Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
-                            if("${l_tts_file}" != ""){
-                                    Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
-									Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
-                                    Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
-                                    Set(res=${CURL_FILE(https://${TTS_S3_URL}/${l_tts_file}.wav)});
-                                    Set(file=${TTS_FILEPATH}/${l_tts_file});
-                                    Playback(${file},noanswer);
-                            }
-                    }
-                }
+                Set(tts_text=${${EVAL(${dial_file})}});
+                &fetch_tts_file_totally(${tts_text});
+				Playback(${tts_file_path_totally});
             }
             break;
         default:
@@ -1095,30 +1051,9 @@ macro ivr_dial() {
 				break;
 		   
 			case 4:    // 4:tts
-				Set(TTS_TEXT=${${cur_node}_dial_remind_voice_file});
-				Set(TTS_FILE=);
-				AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
-				if("${TTS_FILE}" !=""){
-					
-					 Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
-			       	for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
-	            		Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
-	            		if("${l_tts_file}" != ""){
-	            		 	Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
-							Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
-	                        Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
-	                        Set(res=${CURL_FILE(https://${TTS_S3_URL}/${l_tts_file}.wav)});
-	                        Set(file=${TTS_FILEPATH}/${l_tts_file});
-							Set(remind_file=${remind_file}&${file}&noanswer);
-							NoOp("remind_file is "${remind_file});
-	                        //Playback(${file},noanswer);	                	
-			            }
-		        	}
-					
-					
-						                
-				}
-				//Set(remind_file="/var/nfs/tts_cache/7e/7eca689f0d3389d9dea66ae112e5cfd7");
+				Set(tts_text=${${cur_node}_dial_remind_voice_file});
+				&fetch_tts_file_totally(${tts_text});
+				Set(remind_file=${tts_file_path_totally});
 				break;
 			case 5:    // 5:语音变量
 				Set(remind_file=${${cur_node}_dial_remind_voice_file});
@@ -1131,25 +1066,9 @@ macro ivr_dial() {
 				Set(remind_file=${${cur_node}_dial_remind_voice_file});
 				if("${${EVAL(${remind_file})}}" != ""){
 					Set(TTS_TEXT=${${EVAL(${remind_file})}});
-					Set(TTS_FILE=);
-					AGI(agi://${AGI_SERVER}:${AGI_PORT}/TtsSendGet.agi);
-					if("${TTS_FILE}" !=""){
-						Set(l_tts_file_num=${FIELDQTY(TTS_FILE,;)});
-				       	for(i=1;${i}<=${l_tts_file_num};i=${i}+1){
-		            		Set(l_tts_file=${CUT(TTS_FILE,;,${i})});
-		            		if("${l_tts_file}" != ""){
-		            		 	Set(CACHE_FILE=${TTS_FILE_CACHED_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)}/${UNIQUEID}/${l_tts_file}.wav);
-								Set(TTS_FILEPATH=${TTS_FILE_PATH}/${STRFTIME(${EPOCH},,%Y%m%d)});
-		                        Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
-		                        Set(res=${CURL_FILE(https://${TTS_S3_URL}/${l_tts_file}.wav)});
-		                        Set(file=${TTS_FILEPATH}/${l_tts_file});
-								Set(remind_file=${remind_file}&${file}&noanswer);
-								NoOp("remind_file is "${remind_file});
-		                        //Playback(${file},noanswer);	                	
-				            }
-			        	}
-						//Set(remind_file=${TTS_FILE});	                    
-					}
+					&fetch_tts_file_totally(${tts_text});
+					Set(remind_file=${tts_file_path_totally});
+					
 				}
 				break;
 			default:
