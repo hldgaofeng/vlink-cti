@@ -799,6 +799,19 @@ static int acf_curl_file_helper(struct ast_channel *chan, const char *cmd, char 
 		return -1;
 	}
 
+	curl_file = pbx_builtin_getvar_helper(chan, "CURL_FILE");
+	if (ast_strlen_zero(curl_file)){
+	     ast_log(LOG_ERROR, "curl_file is null\n");
+	     return -1;
+	}
+	//if the required file  can be read ,return directly with 0
+	if((fp=fopen(curl_file, "r"))!=NULL){
+        ast_log(LOG_ERROR, " curl file '%s' is already here!!!!!!\n",curl_file);
+        fclose(fp);
+        return 0;
+	}
+
+
 	AST_STANDARD_APP_ARGS(args, info);
 
 	if (url_is_vulnerable(args.url)) {
@@ -815,17 +828,6 @@ static int acf_curl_file_helper(struct ast_channel *chan, const char *cmd, char 
 		return -1;
 	}
 	
-	curl_file = pbx_builtin_getvar_helper(chan, "CURL_FILE");
-    	if (ast_strlen_zero(curl_file)){
-        	ast_log(LOG_ERROR, "curl_file is null\n");
-        	return -1;
-    	}
-	
-	//if the required file  can be read ,return directly with 0
-	if((fp=fopen(curl_file, "r"))!=NULL){
-		fclose(fp);
-		return 0;		
-	}	
 	
 	cache_file = pbx_builtin_getvar_helper(chan, "CACHE_FILE");
 	if (ast_strlen_zero(cache_file)){
