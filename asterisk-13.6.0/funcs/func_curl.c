@@ -825,6 +825,8 @@ static int acf_curl_file_helper(struct ast_channel *chan, const char *cmd, char 
 
 	if (!(curl = ast_threadstorage_get(&curl_instance, sizeof(*curl)))) {
 		ast_log(LOG_ERROR, "Cannot allocate curl structure\n");
+        if (chan)
+             ast_autoservice_stop(chan);
 		return -1;
 	}
 	
@@ -847,6 +849,9 @@ static int acf_curl_file_helper(struct ast_channel *chan, const char *cmd, char 
 	fp = fopen(real_file, "wb+");
 	if(!fp){
             ast_log(LOG_ERROR, "fp is null ${CURL_FILE}=%s\n", real_file);
+            
+            if (chan)
+                ast_autoservice_stop(chan);
             return -1;
 	}
 	
