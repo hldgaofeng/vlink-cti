@@ -32,7 +32,7 @@ macro fetch_tts_file_totally(text)
 					Set(CURL_FILE=${TTS_FILEPATH}/${l_tts_file}.wav);
 					Set(res=${CURL_FILE(${l_tts_url})});
 					Set(file=${TTS_FILEPATH}/${l_tts_file});
-					Set(tts_file_path_totally=${tts_file_path_totally}&${file}&noanswer);
+					Set(tts_file_path_totally=${tts_file_path_totally}&${file}&no);
 					NoOp("tts_file_path_totally is "${tts_file_path_totally});
 						                	
 				}
